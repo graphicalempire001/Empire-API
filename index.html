@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empire-API Documentation Portal</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+        header {
+            border-bottom: 2px solid #334155;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 { color: #38bdf8; margin: 0; font-size: 2.5rem; }
+        h2 { color: #f472b6; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-top: 40px; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        .card h3 { margin-top: 0; color: #fbbf24; }
+        code, pre {
+            background: #020617;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #38bdf8;
+            display: block;
+            overflow-x: auto;
+        }
+        p { color: #cbd5e1; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Empire-API Suite</h1>
+                <p>Official Custom Endpoint Service Platform for Empire-MD WhatsApp Bot</p>
+            </div>
+            <div style="background: #10b981; color: white; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem;">v1.0.0 Online</div>
+        </header>
+
+        <h2>🚀 Custom Endpoints & Services</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>🎥 Video Downloader</h3>
+                <p>Fast, robust download of media URLs using a managed yt-dlp backend wrapper.</p>
+                <code>GET /api/dl?url={URL}&type={mp4|mp3}</code>
+            </div>
+            <div class="card">
+                <h3>🎨 AI Image Generator</h3>
+                <p>Generates high-fidelity visual representations from textual query prompts.</p>
+                <code>GET /api/ai/draw?q={PROMPT}</code>
+            </div>
+            <div class="card">
+                <h3>⚽ Sports Live Tracker</h3>
+                <p>Retrieves matches, league standings, and live score updates.</p>
+                <code>GET /api/sports/live</code>
+            </div>
+            <div class="card">
+                <h3>☁️ Weather Forecast</h3>
+                <p>Accurate, localized conditions and upcoming multi-day prognoses.</p>
+                <code>GET /api/weather?q={CITY}</code>
+            </div>
+            <div class="card">
+                <h3>📄 PDF maker</h3>
+                <p>Compiles styled document bodies into full, standard PDFs on the fly.</p>
+                <code>POST /api/pdf/create { title, content }</code>
+            </div>
+            <div class="card">
+                <h3>🔍 OCR Engine</h3>
+                <p>Performs optical character recognition directly on external image links.</p>
+                <code>POST /api/ocr { imageUrl }</code>
+            </div>
+        </div>
+
+        <h2>📦 Bot Plugin Integration Template</h2>
+        <p>Install the API wrapper directly in your Empire-MD repository under <code>lib/empireApi.js</code>:</p>
+        <pre>
+const axios = require('axios');
+const API_BASE = "https://your-deployed-instance.com/api";
+
+const EmpireAPI = {
+    downloadMedia: (url, type) => axios.get(`${API_BASE}/dl`, { params: { url, type } }),
+    aiImagine: (prompt) => axios.get(`${API_BASE}/ai/draw`, { params: { q: prompt } }),
+    getWeather: (city) => axios.get(`${API_BASE}/weather`, { params: { q: city } })
+};
+
+module.exports = EmpireAPI;
+        </pre>
+    </div>
+</body>
+</html>
