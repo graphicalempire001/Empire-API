@@ -4,7 +4,6 @@ const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -12,350 +11,328 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // 1. Production-ready Video Downloader (using streaming yt-dlp)
 app.get('/api/dl', async (req, res) => {
-    const { url, type } = req.query;
-    if (!url) {
-        // When hit without params (e.g. during plugin import test), return a functional WhatsApp Plugin template!
-        return res.send(`
+  const { url, type } = req.query;
+  if (!url) {
+    // When hit without params (e.g. during plugin import test), return a functional WhatsApp Plugin template!
+    return res.send(`
 module.exports = {
-    dl: async ({ sock, chatJid, mek, text, prefix }) => {
-        if (!text) return sock.sendMessage(chatJid, { text: "❌ Please provide a video URL!" }, { quoted: mek });
-        await sock.sendMessage(chatJid, { text: "📥 Downloading media, please wait..." }, { quoted: mek });
-        try {
-            const apiBase = "https://empire-api-production-53d8.up.railway.app";
-            const type = text.includes("mp3") ? "mp3" : "mp4";
-            const downloadUrl = \`\${apiBase}/api/dl?url=\${encodeURIComponent(text.trim())}&type=\${type}\`;
-            
-            if (type === "mp3") {
-                await sock.sendMessage(chatJid, { audio: { url: downloadUrl }, mimetype: "audio/mpeg" }, { quoted: mek });
-            } else {
-                await sock.sendMessage(chatJid, { video: { url: downloadUrl }, mimetype: "video/mp4" }, { quoted: mek });
-            }
-        } catch (e) {
-            await sock.sendMessage(chatJid, { text: "❌ Downloader error: " + e.message }, { quoted: mek });
-        }
+  dl: async ({ sock, chatJid, mek, text, prefix }) => {
+    if (!text) return sock.sendMessage(chatJid, { text: "❌ Please provide a video URL!" }, { quoted: mek });
+    await sock.sendMessage(chatJid, { text: "📥 Downloading media, please wait..." }, { quoted: mek });
+    try {
+      const apiBase = "https://empire-api-production-53d8.up.railway.app";
+      const type = text.includes("mp3") ? "mp3" : "mp4";
+      const downloadUrl = \`\${apiBase}/api/dl?url=\${encodeURIComponent(text.trim())}&type=\${type}\`;
+      if (type === "mp3") {
+        await sock.sendMessage(chatJid, { audio: { url: downloadUrl }, mimetype: "audio/mpeg" }, { quoted: mek });
+      } else {
+        await sock.sendMessage(chatJid, { video: { url: downloadUrl }, mimetype: "video/mp4" }, { quoted: mek });
+      }
+    } catch (e) {
+      await sock.sendMessage(chatJid, { text: "❌ Downloader error: " + e.message }, { quoted: mek });
     }
+  }
 };
-        `.trim());
+`.trim());
+  }
+  const isMp3 = type === 'mp3';
+  const filename = `download_${Date.now()}.${isMp3 ? 'mp3' : 'mp4'}`;
+  const outputPath = path.join('/tmp', filename);
+  // Dynamic arguments for yt-dlp to support fast serverless streaming limits
+  const args = isMp3
+    ? ['-x', '--audio-format', 'mp3', '-o', outputPath, url]
+    : ['-f', 'best[height<=720][ext=mp4]', '-o', outputPath, url];
+  const ls = spawn('yt-dlp', args);
+  ls.on('close', (code) => {
+    if (code !== 0) {
+      return res.status(500).json({ error: "yt-dlp download failed" });
     }
-
-    const isMp3 = type === 'mp3';
-    const filename = `download_${Date.now()}.${isMp3 ? 'mp3' : 'mp4'}`;
-    const outputPath = path.join('/tmp', filename);
-
-    // Dynamic arguments for yt-dlp to support fast serverless streaming limits
-    const args = isMp3 
-        ? ['-x', '--audio-format', 'mp3', '-o', outputPath, url]
-        : ['-f', 'best[height<=720][ext=mp4]', '-o', outputPath, url];
-
-    const ls = spawn('yt-dlp', args);
-
-    ls.on('close', (code) => {
-        if (code !== 0) {
-            return res.status(500).json({ error: "yt-dlp download failed" });
-        }
-        res.download(outputPath, filename, (err) => {
-            if (err) console.error("Streaming error:", err);
-            fs.unlink(outputPath, (unlinkErr) => {
-                if (unlinkErr) console.error("Cleanup error:", unlinkErr);
-            });
-        });
+    res.download(outputPath, filename, (err) => {
+      if (err) console.error("Streaming error:", err);
+      fs.unlink(outputPath, (unlinkErr) => {
+        if (unlinkErr) console.error("Cleanup error:", unlinkErr);
+      });
     });
+  });
 });
 
 // 2. AI Image Generator (Pollinations AI)
 app.get('/api/ai/draw', async (req, res) => {
-    const q = req.query.q;
-    if (!q) {
-        // WhatsApp Plugin Template!
-        return res.send(`
+  const q = req.query.q;
+  if (!q) {
+    // WhatsApp Plugin Template!
+    return res.send(`
 module.exports = {
-    draw: async ({ sock, chatJid, mek, text, prefix }) => {
-        if (!text) return sock.sendMessage(chatJid, { text: "❌ Please provide a drawing prompt!" }, { quoted: mek });
-        await sock.sendMessage(chatJid, { text: "🎨 Generating image..." }, { quoted: mek });
-        try {
-            const apiBase = "https://empire-api-production-53d8.up.railway.app";
-            const imageUrl = \`\${apiBase}/api/ai/draw?q=\${encodeURIComponent(text.trim())}\`;
-            // Pollinations AI direct image or via API redirection
-            await sock.sendMessage(chatJid, { image: { url: imageUrl }, caption: "🎨 Generated by Empire-AI" }, { quoted: mek });
-        } catch (e) {
-            await sock.sendMessage(chatJid, { text: "❌ Drawing error: " + e.message }, { quoted: mek });
-        }
+  draw: async ({ sock, chatJid, mek, text, prefix }) => {
+    if (!text) return sock.sendMessage(chatJid, { text: "❌ Please provide a drawing prompt!" }, { quoted: mek });
+    await sock.sendMessage(chatJid, { text: "🎨 Generating image..." }, { quoted: mek });
+    try {
+      const apiBase = "https://empire-api-production-53d8.up.railway.app";
+      const imageUrl = \`\${apiBase}/api/ai/draw?q=\${encodeURIComponent(text.trim())}\`;
+      await sock.sendMessage(chatJid, { image: { url: imageUrl }, caption: "🎨 Generated by Empire-AI" }, { quoted: mek });
+    } catch (e) {
+      await sock.sendMessage(chatJid, { text: "❌ Drawing error: " + e.message }, { quoted: mek });
     }
+  }
 };
-        `.trim());
-    }
-
-    const prompt = encodeURIComponent(q);
-    const seed = Math.floor(Math.random() * 99999);
-    const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&seed=${seed}&nologo=true`;
-    
-    // Redirect to the actual image url so WhatsApp can fetch it directly
-    res.redirect(imageUrl);
+`.trim());
+  }
+  const prompt = encodeURIComponent(q);
+  const seed = Math.floor(Math.random() * 99999);
+  const imageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=1024&seed=${seed}&nologo=true`;
+  // Redirect to the actual image url so WhatsApp can fetch it directly
+  res.redirect(imageUrl);
 });
 
 // 3. Sports & Live Match Endpoint (football-data.org)
 app.get('/api/sports/live', async (req, res) => {
-    const token = process.env.FOOTBALL_KEY;
-    if (!req.query.is_plugin && !token) {
-        return res.json({ 
-            success: true, 
-            info: "Register free key at football-data.org and set FOOTBALL_KEY env variable.",
-            matches: [] 
-        });
-    }
-
-    // WhatsApp Plugin Template!
-    if (!token || req.query.is_plugin) {
-        return res.send(`
+  const token = process.env.FOOTBALL_KEY;
+  if (!req.query.is_plugin && !token) {
+    return res.json({
+      success: true,
+      info: "Register free key at football-data.org and set FOOTBALL_KEY env variable.",
+      matches: []
+    });
+  }
+  // WhatsApp Plugin Template!
+  if (!token || req.query.is_plugin) {
+    return res.send(`
 module.exports = {
-    sports: async ({ sock, chatJid, mek, text }) => {
-        await sock.sendMessage(chatJid, { text: "⚽ Fetching live matches..." }, { quoted: mek });
-        try {
-            const axios = require('axios');
-            const resData = await axios.get("https://empire-api-production-53d8.up.railway.app/api/sports/live?fetch=true");
-            const matches = resData.data.matches || [];
-            if (matches.length === 0) {
-                return sock.sendMessage(chatJid, { text: "⚽ No active matches scheduled right now!" }, { quoted: mek });
-            }
-            let msg = "⚽ *Live Football Matches* ⚽\n\n";
-            matches.slice(0, 10).forEach(m => {
-                msg += \`🏆 \${m.competition.name}\n⚔️ \s\${m.homeTeam.name} vs \${m.awayTeam.name}\n⏰ Status: \${m.status}\n\n\`;
-            });
-            await sock.sendMessage(chatJid, { text: msg }, { quoted: mek });
-        } catch (e) {
-            await sock.sendMessage(chatJid, { text: "❌ Sports service error: " + e.message }, { quoted: mek });
-        }
-    }
-};
-        `.trim());
-    }
-
+  sports: async ({ sock, chatJid, mek, text }) => {
+    await sock.sendMessage(chatJid, { text: "⚽ Fetching live matches..." }, { quoted: mek });
     try {
-        const response = await axios.get('https://api.football-data.org/v4/matches', {
-            headers: { 'X-Auth-Token': token }
-        });
-        res.json({ success: true, matches: response.data.matches || [] });
+      const axios = require('axios');
+      const resData = await axios.get("https://empire-api-production-53d8.up.railway.app/api/sports/live?fetch=true");
+      const matches = resData.data.matches || [];
+      if (matches.length === 0) {
+        return sock.sendMessage(chatJid, { text: "⚽ No active matches scheduled right now!" }, { quoted: mek });
+      }
+      let msg = "⚽ *Live Football Matches* ⚽\\n\\n";
+      matches.slice(0, 10).forEach(m => {
+        msg += \`🏆 \${m.competition.name}\\n⚔️ \${m.homeTeam.name} vs \${m.awayTeam.name}\\n⏰ Status: \${m.status}\\n\\n\`;
+      });
+      await sock.sendMessage(chatJid, { text: msg }, { quoted: mek });
     } catch (e) {
-        res.status(500).json({ error: "Football API service error: " + e.message });
+      await sock.sendMessage(chatJid, { text: "❌ Sports service error: " + e.message }, { quoted: mek });
     }
+  }
+};
+`.trim());
+  }
+  try {
+    const response = await axios.get('https://api.football-data.org/v4/matches', {
+      headers: { 'X-Auth-Token': token }
+    });
+    res.json({ success: true, matches: response.data.matches || [] });
+  } catch (e) {
+    res.status(500).json({ error: "Football API service error: " + e.message });
+  }
 });
 
 // 4. Geocoded Weather Endpoint (Open-Meteo + OpenStreetMap Geocoding)
 app.get('/api/weather', async (req, res) => {
-    const { q } = req.query;
-    if (!q) {
-        // WhatsApp Plugin Template!
-        return res.send(`
+  const { q } = req.query;
+  if (!q) {
+    // WhatsApp Plugin Template!
+    return res.send(`
 module.exports = {
-    weather: async ({ sock, chatJid, mek, text }) => {
-        if (!text) return sock.sendMessage(chatJid, { text: "❌ Please provide a city name!" }, { quoted: mek });
-        await sock.sendMessage(chatJid, { text: "🌤️ Fetching weather info..." }, { quoted: mek });
-        try {
-            const axios = require('axios');
-            const resData = await axios.get(\`https://empire-api-production-53d8.up.railway.app/api/weather?q=\${encodeURIComponent(text.trim())}\`);
-            const data = resData.data;
-            if (!data.success) return sock.sendMessage(chatJid, { text: "❌ City not found!" }, { quoted: mek });
-            const msg = \`🌤️ *Weather for \${data.location}*\n\n🌡️ Temperature: \${data.weather.temperature}°C\n💨 Wind: \${data.weather.windspeed} km/h\n☀️ Is Day: \${data.weather.is_day ? "Yes" : "No"}\`;
-            await sock.sendMessage(chatJid, { text: msg }, { quoted: mek });
-        } catch (e) {
-            await sock.sendMessage(chatJid, { text: "❌ Weather service error: " + e.message }, { quoted: mek });
-        }
-    }
-};
-        `.trim());
-    }
-
+  weather: async ({ sock, chatJid, mek, text }) => {
+    if (!text) return sock.sendMessage(chatJid, { text: "❌ Please provide a city name!" }, { quoted: mek });
+    await sock.sendMessage(chatJid, { text: "🌤️ Fetching weather info..." }, { quoted: mek });
     try {
-        // Step 1: Geocode city name to latitude/longitude using OSM (Free, no key)
-        const geoUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`;
-        const geoRes = await axios.get(geoUrl, {
-            headers: { 'User-Agent': 'Empire-MD-Bot-API' }
-        });
-
-        if (!geoRes.data || geoRes.data.length === 0) {
-            return res.status(404).json({ error: "Location not found" });
-        }
-
-        const { lat, lon, display_name } = geoRes.data[0];
-
-        // Step 2: Fetch actual weather from Open-Meteo (Free, no key)
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
-        const weatherRes = await axios.get(weatherUrl);
-
-        res.json({ 
-            success: true, 
-            location: display_name,
-            coordinates: { lat, lon },
-            weather: weatherRes.data.current_weather 
-        });
+      const axios = require('axios');
+      const resData = await axios.get(\`https://empire-api-production-53d8.up.railway.app/api/weather?q=\${encodeURIComponent(text.trim())}\`);
+      const data = resData.data;
+      if (!data.success) return sock.sendMessage(chatJid, { text: "❌ City not found!" }, { quoted: mek });
+      const msg = \`🌤️ *Weather for \${data.location}*\\n\\n🌡️ Temperature: \${data.weather.temperature}°C\\n💨 Wind: \${data.weather.windspeed} km/h\\n☀️ Is Day: \${data.weather.is_day ? "Yes" : "No"}\`;
+      await sock.sendMessage(chatJid, { text: msg }, { quoted: mek });
     } catch (e) {
-        res.status(500).json({ error: "Weather/Geocoding service error: " + e.message });
+      await sock.sendMessage(chatJid, { text: "❌ Weather service error: " + e.message }, { quoted: mek });
     }
+  }
+};
+`.trim());
+  }
+  try {
+    // Step 1: Geocode city name to latitude/longitude using OSM (Free, no key)
+    const geoUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`;
+    const geoRes = await axios.get(geoUrl, {
+      headers: { 'User-Agent': 'Empire-MD-Bot-API' }
+    });
+    if (!geoRes.data || geoRes.data.length === 0) {
+      return res.status(404).json({ error: "Location not found" });
+    }
+    const { lat, lon, display_name } = geoRes.data[0];
+    // Step 2: Fetch actual weather from Open-Meteo (Free, no key)
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+    const weatherRes = await axios.get(weatherUrl);
+    res.json({
+      success: true,
+      location: display_name,
+      coordinates: { lat, lon },
+      weather: weatherRes.data.current_weather
+    });
+  } catch (e) {
+    res.status(500).json({ error: "Weather/Geocoding service error: " + e.message });
+  }
 });
 
 // 5. PDF Maker (pdfkit)
 app.get('/api/pdf', (req, res) => {
-    // WhatsApp Plugin Template!
-    return res.send(`
+  // WhatsApp Plugin Template!
+  return res.send(`
 module.exports = {
-    pdf: async ({ sock, chatJid, mek, text }) => {
-        if (!text) return sock.sendMessage(chatJid, { text: "❌ Please provide text to write into the PDF!" }, { quoted: mek });
-        await sock.sendMessage(chatJid, { text: "📄 Creating PDF document..." }, { quoted: mek });
-        try {
-            const axios = require('axios');
-            const response = await axios.post("https://empire-api-production-53d8.up.railway.app/api/pdf/create", {
-                title: "Empire PDF Document",
-                content: text.trim()
-            }, { responseType: 'arraybuffer' });
-            
-            await sock.sendMessage(chatJid, { 
-                document: Buffer.from(response.data), 
-                mimetype: "application/pdf", 
-                fileName: "Empire_Document.pdf" 
-            }, { quoted: mek });
-        } catch (e) {
-            await sock.sendMessage(chatJid, { text: "❌ PDF generator error: " + e.message }, { quoted: mek });
-        }
+  pdf: async ({ sock, chatJid, mek, text }) => {
+    if (!text) return sock.sendMessage(chatJid, { text: "❌ Please provide text to write into the PDF!" }, { quoted: mek });
+    await sock.sendMessage(chatJid, { text: "📄 Creating PDF document..." }, { quoted: mek });
+    try {
+      const axios = require('axios');
+      const response = await axios.post("https://empire-api-production-53d8.up.railway.app/api/pdf/create", {
+        title: "Empire PDF Document",
+        content: text.trim()
+      }, { responseType: 'arraybuffer' });
+      await sock.sendMessage(chatJid, {
+        document: Buffer.from(response.data),
+        mimetype: "application/pdf",
+        fileName: "Empire_Document.pdf"
+      }, { quoted: mek });
+    } catch (e) {
+      await sock.sendMessage(chatJid, { text: "❌ PDF generator error: " + e.message }, { quoted: mek });
     }
+  }
 };
-    `.trim());
+`.trim());
 });
 
 app.post('/api/pdf/create', (req, res) => {
-    const doc = new PDFDocument();
-    res.setHeader('Content-Type', 'application/pdf');
-    doc.pipe(res);
-    doc.fontSize(20).text(req.body.title || 'Empire Document', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(12).text(req.body.content || 'Generated via Empire-API custom service.');
-    doc.end();
+  const doc = new PDFDocument();
+  res.setHeader('Content-Type', 'application/pdf');
+  doc.pipe(res);
+  doc.fontSize(20).text(req.body.title || 'Empire Document', { align: 'center' });
+  doc.moveDown();
+  doc.fontSize(12).text(req.body.content || 'Generated via Empire-API custom service.');
+  doc.end();
 });
 
 // 6. OCR Tool (OCR.space Integration)
 app.get('/api/ocr', async (req, res) => {
-    // WhatsApp Plugin Template!
-    return res.send(`
+  // WhatsApp Plugin Template!
+  return res.send(`
 module.exports = {
-    ocr: async ({ sock, chatJid, mek, prefix }) => {
-        const getQuoted = (m) => {
-            if (m.quoted && m.quoted.message) return { message: m.quoted.message, type: m.quoted.type };
-            let q = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            if (!q) return null;
-            return { message: q, type: Object.keys(q)[0] };
-        };
-        
-        const qMsg = getQuoted(mek);
-        const hasImage = mek.message?.imageMessage || qMsg?.type === "imageMessage";
-        if (!hasImage) return sock.sendMessage(chatJid, { text: "❌ Please reply to an image or send an image with command to extract text!" }, { quoted: mek });
-        
-        await sock.sendMessage(chatJid, { text: "🔍 Extracting text from image..." }, { quoted: mek });
-        try {
-            const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-            const node = qMsg ? qMsg.message : mek.message;
-            const stream = await downloadContentFromMessage(node.imageMessage, 'image');
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-            
-            // Upload to a free host to get a URL for the OCR API
-            const FormData = require('form-data');
-            const form = new FormData();
-            form.append('file', buffer, 'image.jpg');
-            
-            const uploadRes = await require('axios').post('https://telegra.ph/upload', form, { headers: form.getHeaders() });
-            const imgUrl = "https://telegra.ph" + uploadRes.data[0].src;
-            
-            const ocrResult = await require('axios').post("https://empire-api-production-53d8.up.railway.app/api/ocr/process", { imageUrl: imgUrl });
-            await sock.sendMessage(chatJid, { text: "📝 *Extracted Text:*\n\n" + ocrResult.data.text }, { quoted: mek });
-        } catch (e) {
-            await sock.sendMessage(chatJid, { text: "❌ OCR failed: " + e.message }, { quoted: mek });
-        }
+  ocr: async ({ sock, chatJid, mek, prefix }) => {
+    const getQuoted = (m) => {
+      if (m.quoted && m.quoted.message) return { message: m.quoted.message, type: m.quoted.type };
+      let q = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      if (!q) return null;
+      return { message: q, type: Object.keys(q)[0] };
+    };
+    const qMsg = getQuoted(mek);
+    const hasImage = mek.message?.imageMessage || qMsg?.type === "imageMessage";
+    if (!hasImage) return sock.sendMessage(chatJid, { text: "❌ Please reply to an image or send an image with command to extract text!" }, { quoted: mek });
+    await sock.sendMessage(chatJid, { text: "🔍 Extracting text from image..." }, { quoted: mek });
+    try {
+      const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+      const node = qMsg ? qMsg.message : mek.message;
+      const stream = await downloadContentFromMessage(node.imageMessage, 'image');
+      let buffer = Buffer.from([]);
+      for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+      // Upload to a free host to get a URL for the OCR API
+      const FormData = require('form-data');
+      const form = new FormData();
+      form.append('file', buffer, 'image.jpg');
+      const uploadRes = await require('axios').post('https://telegra.ph/upload', form, { headers: form.getHeaders() });
+      const imgUrl = "https://telegra.ph" + uploadRes.data[0].src;
+      const ocrResult = await require('axios').post("https://empire-api-production-53d8.up.railway.app/api/ocr/process", { imageUrl: imgUrl });
+      await sock.sendMessage(chatJid, { text: "📝 *Extracted Text:*\\n\\n" + ocrResult.data.text }, { quoted: mek });
+    } catch (e) {
+      await sock.sendMessage(chatJid, { text: "❌ OCR failed: " + e.message }, { quoted: mek });
     }
+  }
 };
-    `.trim());
+`.trim());
 });
 
 app.post('/api/ocr/process', async (req, res) => {
-    const { imageUrl } = req.body;
-    if (!imageUrl) return res.status(400).json({ error: "imageUrl is required in body" });
-
-    const apiKey = process.env.OCR_KEY;
-    if (!apiKey) {
-        return res.json({ 
-            success: true, 
-            text: "[Placeholder OCR] No OCR_KEY set. Please define OCR_KEY in your Railway deployment." 
-        });
-    }
-
-    try {
-        const response = await axios.get('https://api.ocr.space/parse/imageurl', {
-            params: { apikey: apiKey, url: imageUrl, OCREngine: 2 }
-        });
-        res.json({ 
-            success: true, 
-            text: response.data.ParsedResults?.[0]?.ParsedText || "No text detected." 
-        });
-    } catch (e) {
-        res.status(500).json({ error: "OCR space API error: " + e.message });
-    }
+  const { imageUrl } = req.body;
+  if (!imageUrl) return res.status(400).json({ error: "imageUrl is required in body" });
+  const apiKey = process.env.OCR_KEY;
+  if (!apiKey) {
+    return res.json({
+      success: true,
+      text: "[Placeholder OCR] No OCR_KEY set. Please define OCR_KEY in your Railway deployment."
+    });
+  }
+  try {
+    const response = await axios.get('https://api.ocr.space/parse/imageurl', {
+      params: { apikey: apiKey, url: imageUrl, OCREngine: 2 }
+    });
+    res.json({
+      success: true,
+      text: response.data.ParsedResults?.[0]?.ParsedText || "No text detected."
+    });
+  } catch (e) {
+    res.status(500).json({ error: "OCR space API error: " + e.message });
+  }
 });
 
 // 7. Self-Learning Brain Endpoints
 app.get('/api/brain', (req, res) => {
-    // WhatsApp Plugin Template!
-    return res.send(`
+  // WhatsApp Plugin Template!
+  return res.send(`
 module.exports = {
-    teach: async ({ sock, chatJid, mek, text }) => {
-        const parts = (text || "").split("=>");
-        if (parts.length < 2) return sock.sendMessage(chatJid, { text: "❌ Usage: .teach query => reply" }, { quoted: mek });
-        try {
-            await require('axios').post("https://empire-api-production-53d8.up.railway.app/api/brain/teach", {
-                trigger: parts[0].trim(),
-                response: parts[1].trim()
-            });
-            await sock.sendMessage(chatJid, { text: "🧠 Learned successfully!" }, { quoted: mek });
-        } catch (e) {
-            await sock.sendMessage(chatJid, { text: "❌ Teach failed: " + e.message }, { quoted: mek });
-        }
-    },
-    brain: async ({ sock, chatJid, mek, text }) => {
-        if (!text) return sock.sendMessage(chatJid, { text: "❌ Ask me anything!" }, { quoted: mek });
-        try {
-            const resData = await require('axios').get(\`https://empire-api-production-53d8.up.railway.app/api/brain/query?q=\${encodeURIComponent(text.trim())}\`);
-            if (resData.data.reply) {
-                await sock.sendMessage(chatJid, { text: "🧠 *Brain response:* " + resData.data.reply }, { quoted: mek });
-            } else {
-                await sock.sendMessage(chatJid, { text: "🧠 I don't know that yet! Teach me using: \n*.teach " + text.trim() + " => your reply*" }, { quoted: mek });
-            }
-        } catch (e) {
-            await sock.sendMessage(chatJid, { text: "❌ Brain query failed: " + e.message }, { quoted: mek });
-        }
+  teach: async ({ sock, chatJid, mek, text }) => {
+    const parts = (text || "").split("=>");
+    if (parts.length < 2) return sock.sendMessage(chatJid, { text: "❌ Usage: .teach query => reply" }, { quoted: mek });
+    try {
+      await require('axios').post("https://empire-api-production-53d8.up.railway.app/api/brain/teach", {
+        trigger: parts[0].trim(),
+        response: parts[1].trim()
+      });
+      await sock.sendMessage(chatJid, { text: "🧠 Learned successfully!" }, { quoted: mek });
+    } catch (e) {
+      await sock.sendMessage(chatJid, { text: "❌ Teach failed: " + e.message }, { quoted: mek });
     }
+  },
+  brain: async ({ sock, chatJid, mek, text }) => {
+    if (!text) return sock.sendMessage(chatJid, { text: "❌ Ask me anything!" }, { quoted: mek });
+    try {
+      const resData = await require('axios').get(\`https://empire-api-production-53d8.up.railway.app/api/brain/query?q=\${encodeURIComponent(text.trim())}\`);
+      if (resData.data.reply) {
+        await sock.sendMessage(chatJid, { text: "🧠 *Brain response:* " + resData.data.reply }, { quoted: mek });
+      } else {
+        await sock.sendMessage(chatJid, { text: "🧠 I don't know that yet! Teach me using: \\n*.teach " + text.trim() + " => your reply*" }, { quoted: mek });
+      }
+    } catch (e) {
+      await sock.sendMessage(chatJid, { text: "❌ Brain query failed: " + e.message }, { quoted: mek });
+    }
+  }
 };
-    `.trim());
+`.trim());
 });
 
 const localBrain = {}; // Memory store
+
 app.post('/api/brain/teach', (req, res) => {
-    const { trigger, response, sessionId } = req.body;
-    if (!trigger || !response) return res.status(400).json({ error: "Trigger and response required" });
-    const session = sessionId || 'default';
-    if (!localBrain[session]) localBrain[session] = {};
-    localBrain[session][trigger.toLowerCase()] = response;
-    res.json({ success: true, message: "Brain updated" });
+  const { trigger, response, sessionId } = req.body;
+  if (!trigger || !response) return res.status(400).json({ error: "Trigger and response required" });
+  const session = sessionId || 'default';
+  if (!localBrain[session]) localBrain[session] = {};
+  localBrain[session][trigger.toLowerCase()] = response;
+  res.json({ success: true, message: "Brain updated" });
 });
 
 app.get('/api/brain/query', (req, res) => {
-    const { q, sessionId } = req.query;
-    if (!q) return res.status(400).json({ error: "Query 'q' required" });
-    const session = sessionId || 'default';
-    const normalized = q.toLowerCase().trim();
-    const reply = localBrain[session]?.[normalized] || null;
-    res.json({ success: true, reply });
+  const { q, sessionId } = req.query;
+  if (!q) return res.status(400).json({ error: "Query 'q' required" });
+  const session = sessionId || 'default';
+  const normalized = q.toLowerCase().trim();
+  const reply = localBrain[session]?.[normalized] || null;
+  res.json({ success: true, reply });
 });
 
 app.listen(PORT, () => console.log(`Empire-API active on port ${PORT}`));
